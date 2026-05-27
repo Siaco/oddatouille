@@ -1,21 +1,36 @@
-mod app;
-mod ui;
+use std::io;
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
+
 mod api;
+mod app;
 mod cache;
 mod events;
+mod ui;
 
 use app::App;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Setup terminal
+    enable_raw_mode()?;
+    io::stdout().execute(EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+
+    // Create and run app
     let mut app = App::new();
+    let res = app.run(&mut terminal).await;
 
-    // Placeholder for terminal initialization
-    println!("oddatui starting...");
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
 
-    while app.running {
-        // Main application loop
-        app.quit(); // Immediately quit for now since loop isn't fully implemented
+    // Handle errors
+    if let Err(err) = res {
+        println!("{:?}", err);
     }
 
     Ok(())
