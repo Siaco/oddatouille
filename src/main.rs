@@ -1,9 +1,9 @@
-use std::io;
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io;
 
 mod api;
 mod app;
