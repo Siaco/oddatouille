@@ -42,18 +42,32 @@ fn draw_header(app: &App, frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .border_style(Style::default().fg(COLOR_BORDER));
-    
+
     // Costruisci il Breadcrumb dinamico
     let mut breadcrumb = vec![
-        Span::styled(" ODDATUI ", Style::default().fg(COLOR_ACTIVE_ITEM_FG).bg(COLOR_ACTIVE_ITEM_BG).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " ODDATUI ",
+            Style::default()
+                .fg(COLOR_ACTIVE_ITEM_FG)
+                .bg(COLOR_ACTIVE_ITEM_BG)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("  "),
     ];
 
     if let Some(sport) = app.sports.get(app.selected_sport) {
-        breadcrumb.push(Span::styled(sport.name.clone(), Style::default().fg(COLOR_TEXT)));
+        breadcrumb.push(Span::styled(
+            sport.name.clone(),
+            Style::default().fg(COLOR_TEXT),
+        ));
         if let Some(match_data) = sport.matches.get(app.selected_match) {
             breadcrumb.push(Span::styled(" > ", Style::default().fg(COLOR_BORDER)));
-            breadcrumb.push(Span::styled(match_data.title.clone(), Style::default().fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)));
+            breadcrumb.push(Span::styled(
+                match_data.title.clone(),
+                Style::default()
+                    .fg(COLOR_ACTIVE_ITEM_FG)
+                    .add_modifier(Modifier::BOLD),
+            ));
         }
     }
 
@@ -78,22 +92,45 @@ fn draw_main_body(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_sports_column(app: &App, frame: &mut Frame, area: Rect) {
     let is_active = app.active_column == ActiveColumn::Sports;
-    let border_color = if is_active { COLOR_BORDER_ACTIVE } else { COLOR_BORDER };
+    let border_color = if is_active {
+        COLOR_BORDER_ACTIVE
+    } else {
+        COLOR_BORDER
+    };
 
     let block = Block::default()
-        .title(Span::styled(" Sport ", Style::default().fg(if is_active { COLOR_ACTIVE_ITEM_FG } else { COLOR_TEXT })))
+        .title(Span::styled(
+            " Sport ",
+            Style::default().fg(if is_active {
+                COLOR_ACTIVE_ITEM_FG
+            } else {
+                COLOR_TEXT
+            }),
+        ))
         .borders(Borders::ALL)
-        .border_type(if is_active { BorderType::Thick } else { BorderType::Plain })
+        .border_type(if is_active {
+            BorderType::Thick
+        } else {
+            BorderType::Plain
+        })
         .border_style(Style::default().fg(border_color));
 
-    let items: Vec<ListItem> = app.sports.iter().enumerate().map(|(i, sport)| {
-        let style = if i == app.selected_sport {
-            Style::default().bg(COLOR_ACTIVE_ITEM_BG).fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(COLOR_TEXT)
-        };
-        ListItem::new(Line::from(format!("  {}  ", sport.name))).style(style)
-    }).collect();
+    let items: Vec<ListItem> = app
+        .sports
+        .iter()
+        .enumerate()
+        .map(|(i, sport)| {
+            let style = if i == app.selected_sport {
+                Style::default()
+                    .bg(COLOR_ACTIVE_ITEM_BG)
+                    .fg(COLOR_ACTIVE_ITEM_FG)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(COLOR_TEXT)
+            };
+            ListItem::new(Line::from(format!("  {}  ", sport.name))).style(style)
+        })
+        .collect();
 
     let list = List::new(items).block(block);
     frame.render_widget(list, area);
@@ -101,19 +138,37 @@ fn draw_sports_column(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_matches_column(app: &App, frame: &mut Frame, area: Rect) {
     let is_active = app.active_column == ActiveColumn::Matches;
-    let border_color = if is_active { COLOR_BORDER_ACTIVE } else { COLOR_BORDER };
+    let border_color = if is_active {
+        COLOR_BORDER_ACTIVE
+    } else {
+        COLOR_BORDER
+    };
 
     let block = Block::default()
-        .title(Span::styled(" Eventi ", Style::default().fg(if is_active { COLOR_ACTIVE_ITEM_FG } else { COLOR_TEXT })))
+        .title(Span::styled(
+            " Eventi ",
+            Style::default().fg(if is_active {
+                COLOR_ACTIVE_ITEM_FG
+            } else {
+                COLOR_TEXT
+            }),
+        ))
         .borders(Borders::ALL)
-        .border_type(if is_active { BorderType::Thick } else { BorderType::Plain })
+        .border_type(if is_active {
+            BorderType::Thick
+        } else {
+            BorderType::Plain
+        })
         .border_style(Style::default().fg(border_color));
 
     let mut items = Vec::new();
     if let Some(sport) = app.sports.get(app.selected_sport) {
         for (i, match_data) in sport.matches.iter().enumerate() {
             let style = if i == app.selected_match {
-                Style::default().bg(COLOR_ACTIVE_ITEM_BG).fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .bg(COLOR_ACTIVE_ITEM_BG)
+                    .fg(COLOR_ACTIVE_ITEM_FG)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(COLOR_TEXT)
             };
@@ -127,7 +182,10 @@ fn draw_matches_column(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
     let block = Block::default()
-        .title(Span::styled(" Quote & Analisi ", Style::default().fg(COLOR_TEXT)))
+        .title(Span::styled(
+            " Quote & Analisi ",
+            Style::default().fg(COLOR_TEXT),
+        ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .border_style(Style::default().fg(COLOR_BORDER));
@@ -137,25 +195,29 @@ fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
 
     if let Some(sport) = app.sports.get(app.selected_sport) {
         if let Some(match_data) = sport.matches.get(app.selected_match) {
-            
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(10), 
-                    Constraint::Length(6), 
-                ])
+                .constraints([Constraint::Min(10), Constraint::Length(6)])
                 .margin(1) // Padding within the block
                 .split(inner_area);
 
             // Draw Odds with Gauges
-            let mut odd_rects = Layout::default()
+            let odd_rects = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(match_data.odds.iter().map(|_| Constraint::Length(2)).collect::<Vec<_>>())
+                .constraints(
+                    match_data
+                        .odds
+                        .iter()
+                        .map(|_| Constraint::Length(2))
+                        .collect::<Vec<_>>(),
+                )
                 .split(chunks[0]);
 
             for (i, odd) in match_data.odds.iter().enumerate() {
-                if i >= odd_rects.len() { break; }
-                
+                if i >= odd_rects.len() {
+                    break;
+                }
+
                 let odd_area = odd_rects[i];
                 let odd_chunks = Layout::default()
                     .direction(Direction::Horizontal)
@@ -167,17 +229,27 @@ fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
                     .split(odd_area);
 
                 // Name
-                frame.render_widget(Paragraph::new(odd.name.clone()).style(Style::default().fg(COLOR_ACTIVE_ITEM_FG)), odd_chunks[0]);
-                
+                frame.render_widget(
+                    Paragraph::new(odd.name.clone())
+                        .style(Style::default().fg(COLOR_ACTIVE_ITEM_FG)),
+                    odd_chunks[0],
+                );
+
                 // Price & Color logic
                 let prob = (1.0 / odd.price) * 100.0;
                 let prob_ratio = prob / 100.0;
-                let color = if odd.price < 2.0 { COLOR_SAFE } else if odd.price < 4.0 { COLOR_MID } else { COLOR_RISK };
+                let color = if odd.price < 2.0 {
+                    COLOR_SAFE
+                } else if odd.price < 4.0 {
+                    COLOR_MID
+                } else {
+                    COLOR_RISK
+                };
 
                 frame.render_widget(
                     Paragraph::new(format!("{:.2}", odd.price))
                         .style(Style::default().fg(color).add_modifier(Modifier::BOLD)),
-                    odd_chunks[1]
+                    odd_chunks[1],
                 );
 
                 // Gauge
@@ -185,7 +257,7 @@ fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
                     .gauge_style(Style::default().fg(color).bg(COLOR_BORDER))
                     .ratio(prob_ratio.clamp(0.0, 1.0))
                     .label(format!("{:.1}%", prob));
-                
+
                 let gauge_area = Rect {
                     x: odd_chunks[2].x,
                     y: odd_chunks[2].y,
@@ -216,7 +288,7 @@ fn draw_footer(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .style(Style::default().fg(COLOR_BORDER));
-    
+
     let paragraph = Paragraph::new(Line::from(vec![
         Span::styled(" [TAB/Freccie] ", Style::default().fg(COLOR_BORDER_ACTIVE)),
         Span::raw("Naviga  "),
@@ -224,6 +296,6 @@ fn draw_footer(frame: &mut Frame, area: Rect) {
         Span::raw("Esci"),
     ]))
     .block(block);
-    
+
     frame.render_widget(paragraph, area);
 }

@@ -32,10 +32,10 @@ pub struct App {
     /// Is the application running?
     pub running: bool,
     pub active_column: ActiveColumn,
-    
+
     // Mock Data
     pub sports: Vec<SportMock>,
-    
+
     // Selection state
     pub selected_sport: usize,
     pub selected_match: usize,
@@ -99,7 +99,7 @@ impl App {
             }
         ];
 
-        Self { 
+        Self {
             running: true,
             active_column: ActiveColumn::Sports,
             sports,
@@ -160,18 +160,14 @@ impl App {
                         match key.code {
                             KeyCode::Char('q') | KeyCode::Esc => self.quit(),
                             KeyCode::Tab | KeyCode::Right | KeyCode::Left => self.toggle_column(),
-                            KeyCode::Down | KeyCode::Char('j') => {
-                                match self.active_column {
-                                    ActiveColumn::Sports => self.next_sport(),
-                                    ActiveColumn::Matches => self.next_match(),
-                                }
-                            }
-                            KeyCode::Up | KeyCode::Char('k') => {
-                                match self.active_column {
-                                    ActiveColumn::Sports => self.prev_sport(),
-                                    ActiveColumn::Matches => self.prev_match(),
-                                }
-                            }
+                            KeyCode::Down | KeyCode::Char('j') => match self.active_column {
+                                ActiveColumn::Sports => self.next_sport(),
+                                ActiveColumn::Matches => self.next_match(),
+                            },
+                            KeyCode::Up | KeyCode::Char('k') => match self.active_column {
+                                ActiveColumn::Sports => self.prev_sport(),
+                                ActiveColumn::Matches => self.prev_match(),
+                            },
                             _ => {}
                         }
                     }
