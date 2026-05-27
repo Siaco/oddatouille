@@ -1,8 +1,11 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event as CEvent, KeyCode, KeyEventKind};
 use ratatui::{backend::Backend, Terminal};
 use std::time::Duration;
+use std::collections::HashMap;
 
+use crate::api::OddsApi;
+use crate::models::{Event, Sport};
 use crate::ui;
 
 #[derive(PartialEq)]
@@ -11,101 +14,36 @@ pub enum ActiveColumn {
     Matches,
 }
 
-pub struct OddMock {
-    pub name: String,
-    pub price: f64,
-}
-
-pub struct MatchMock {
-    pub title: String,
-    pub odds: Vec<OddMock>,
-    pub prediction: String,
-}
-
-pub struct SportMock {
-    pub name: String,
-    pub matches: Vec<MatchMock>,
-}
-
-/// Application state
 pub struct App {
-    /// Is the application running?
     pub running: bool,
     pub active_column: ActiveColumn,
-
-    // Mock Data
-    pub sports: Vec<SportMock>,
-
+    
+    // Real Data
+    pub api: OddsApi,
+    pub sports: Vec<Sport>,
+    pub events: HashMap<String, Vec<Event>>, // sport_key -> events
+    
     // Selection state
     pub selected_sport: usize,
     pub selected_match: usize,
+    pub is_loading: bool,
+    pub error_msg: Option<String>,
 }
 
 impl App {
-    /// Construct a new instance of [`App`].
-    pub fn new() -> Self {
-        // Build mock data
-        let sports = vec![
-            SportMock {
-                name: "Calcio".into(),
-                matches: vec![
-                    MatchMock {
-                        title: "Vincente Serie A 24/25".into(),
-                        odds: vec![
-                            OddMock { name: "Inter".into(), price: 1.85 },
-                            OddMock { name: "Juventus".into(), price: 3.50 },
-                            OddMock { name: "Napoli".into(), price: 4.00 },
-                        ],
-                        prediction: "L'Inter ha mantenuto l'ossatura della squadra campione, rendendola la favorita statistica.".into(),
-                    },
-                    MatchMock {
-                        title: "Vincente Champions League".into(),
-                        odds: vec![
-                            OddMock { name: "Real Madrid".into(), price: 3.00 },
-                            OddMock { name: "Man City".into(), price: 3.25 },
-                            OddMock { name: "Bayern".into(), price: 6.50 },
-                        ],
-                        prediction: "Con l'aggiunta di Mbappé, il Real Madrid domina i modelli predittivi.".into(),
-                    }
-                ]
-            },
-            SportMock {
-                name: "Basket (NBA)".into(),
-                matches: vec![
-                    MatchMock {
-                        title: "NBA Championship Winner".into(),
-                        odds: vec![
-                            OddMock { name: "Boston Celtics".into(), price: 4.00 },
-                            OddMock { name: "Denver Nuggets".into(), price: 5.50 },
-                            OddMock { name: "OKC Thunder".into(), price: 8.00 },
-                        ],
-                        prediction: "I Celtics vantano il miglior net rating proiettato per la stagione.".into(),
-                    }
-                ]
-            },
-            SportMock {
-                name: "Tennis".into(),
-                matches: vec![
-                    MatchMock {
-                        title: "Wimbledon 2025 Men".into(),
-                        odds: vec![
-                            OddMock { name: "C. Alcaraz".into(), price: 2.20 },
-                            OddMock { name: "J. Sinner".into(), price: 2.75 },
-                            OddMock { name: "N. Djokovic".into(), price: 4.50 },
-                        ],
-                        prediction: "L'algoritmo rileva un vantaggio marginale di Alcaraz sull'erba rispetto a Sinner.".into(),
-                    }
-                ]
-            }
-        ];
-
-        Self {
+    pub fn new() -> Result<Self> {
+        let api = OddsApi::new()?;
+        Ok(Self { 
             running: true,
             active_column: ActiveColumn::Sports,
-            sports,
+            api,
+            sports: Vec::new(),
+            events: HashMap::new(),
             selected_sport: 0,
             selected_match: 0,
-        }
+            is_loading: false,
+            error_msg: None,
+        })
     }
 
     pub fn tick(&self) {}
@@ -114,24 +52,46 @@ impl App {
         self.running = false;
     }
 
-    pub fn next_sport(&mut self) {
-        if self.selected_sport + 1 < self.sports.len() {
-            self.selected_sport += 1;
-            self.selected_match = 0; // Reset match selection when sport changes
+    pub async fn load_current_sport_outrights(&mut self) {
+        if let Some(sport) = self.sports.get(self.selected_sport) {
+            let key = sport.key.clone();
+            if !self.events.contains_key(&key) {
+                self.is_loading = true;
+                match self.api.fetch_outrights(&key).await {
+                    Ok(events) => { 
+                        // Only keep events that actually have bookmakers/odds
+                        let valid_events: Vec<Event> = events.into_iter().filter(|e| !e.bookmakers.is_empty()).collect();
+                        self.events.insert(key, valid_events); 
+                    },
+                    Err(e) => { self.error_msg = Some(format!("API Error: {}", e)); },
+                }
+                self.is_loading = false;
+            }
         }
     }
 
-    pub fn prev_sport(&mut self) {
+    pub async fn next_sport(&mut self) {
+        if self.selected_sport + 1 < self.sports.len() {
+            self.selected_sport += 1;
+            self.selected_match = 0;
+            self.load_current_sport_outrights().await;
+        }
+    }
+
+    pub async fn prev_sport(&mut self) {
         if self.selected_sport > 0 {
             self.selected_sport -= 1;
             self.selected_match = 0;
+            self.load_current_sport_outrights().await;
         }
     }
 
     pub fn next_match(&mut self) {
         if let Some(sport) = self.sports.get(self.selected_sport) {
-            if self.selected_match + 1 < sport.matches.len() {
-                self.selected_match += 1;
+            if let Some(events) = self.events.get(&sport.key) {
+                if self.selected_match + 1 < events.len() {
+                    self.selected_match += 1;
+                }
             }
         }
     }
@@ -149,25 +109,45 @@ impl App {
         };
     }
 
-    /// Run the application loop
     pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
+        
+        // Initial Fetch
+        self.is_loading = true;
+        terminal.draw(|frame| ui::render(self, frame))?;
+        
+        match self.api.fetch_sports().await {
+            Ok(s) => {
+                self.sports = s.into_iter().filter(|s| s.has_outrights && s.active).collect();
+                if !self.sports.is_empty() {
+                    self.load_current_sport_outrights().await;
+                }
+            },
+            Err(e) => self.error_msg = Some(format!("API Error: {}", e)),
+        }
+        self.is_loading = false;
+
+        // Main Loop
         while self.running {
             terminal.draw(|frame| ui::render(self, frame))?;
 
             if event::poll(Duration::from_millis(250))? {
-                if let Event::Key(key) = event::read()? {
+                if let CEvent::Key(key) = event::read()? {
                     if key.kind == KeyEventKind::Press {
                         match key.code {
                             KeyCode::Char('q') | KeyCode::Esc => self.quit(),
                             KeyCode::Tab | KeyCode::Right | KeyCode::Left => self.toggle_column(),
-                            KeyCode::Down | KeyCode::Char('j') => match self.active_column {
-                                ActiveColumn::Sports => self.next_sport(),
-                                ActiveColumn::Matches => self.next_match(),
-                            },
-                            KeyCode::Up | KeyCode::Char('k') => match self.active_column {
-                                ActiveColumn::Sports => self.prev_sport(),
-                                ActiveColumn::Matches => self.prev_match(),
-                            },
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                match self.active_column {
+                                    ActiveColumn::Sports => self.next_sport().await,
+                                    ActiveColumn::Matches => self.next_match(),
+                                }
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                match self.active_column {
+                                    ActiveColumn::Sports => self.prev_sport().await,
+                                    ActiveColumn::Matches => self.prev_match(),
+                                }
+                            }
                             _ => {}
                         }
                     }

@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
     // Create and run app
-    let mut app = App::new();
+    let mut app = App::new()?;
     let res = app.run(&mut terminal).await;
 
     // Restore terminal

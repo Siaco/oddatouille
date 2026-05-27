@@ -9,7 +9,6 @@ use ratatui::{
 use crate::app::{ActiveColumn, App};
 
 // Palette Finance / Modern
-const COLOR_BG: Color = Color::Reset; // Keep terminal background
 const COLOR_BORDER: Color = Color::Rgb(60, 60, 60);
 const COLOR_BORDER_ACTIVE: Color = Color::Rgb(100, 150, 255); // Soft Blue Focus
 const COLOR_ACTIVE_ITEM_BG: Color = Color::Rgb(35, 50, 80);
@@ -42,32 +41,26 @@ fn draw_header(app: &App, frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .border_style(Style::default().fg(COLOR_BORDER));
-
-    // Costruisci il Breadcrumb dinamico
+    
     let mut breadcrumb = vec![
-        Span::styled(
-            " ODDATUI ",
-            Style::default()
-                .fg(COLOR_ACTIVE_ITEM_FG)
-                .bg(COLOR_ACTIVE_ITEM_BG)
-                .add_modifier(Modifier::BOLD),
-        ),
+        Span::styled(" ODDATUI ", Style::default().fg(COLOR_ACTIVE_ITEM_FG).bg(COLOR_ACTIVE_ITEM_BG).add_modifier(Modifier::BOLD)),
         Span::raw("  "),
     ];
 
-    if let Some(sport) = app.sports.get(app.selected_sport) {
-        breadcrumb.push(Span::styled(
-            sport.name.clone(),
-            Style::default().fg(COLOR_TEXT),
-        ));
-        if let Some(match_data) = sport.matches.get(app.selected_match) {
-            breadcrumb.push(Span::styled(" > ", Style::default().fg(COLOR_BORDER)));
-            breadcrumb.push(Span::styled(
-                match_data.title.clone(),
-                Style::default()
-                    .fg(COLOR_ACTIVE_ITEM_FG)
-                    .add_modifier(Modifier::BOLD),
-            ));
+    if app.is_loading {
+        breadcrumb.push(Span::styled(" Caricamento dati via API... ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
+    } else if let Some(err) = &app.error_msg {
+        breadcrumb.push(Span::styled(format!(" ERRORE: {} ", err), Style::default().fg(Color::Red)));
+    } else if let Some(sport) = app.sports.get(app.selected_sport) {
+        breadcrumb.push(Span::styled(sport.title.clone(), Style::default().fg(COLOR_TEXT)));
+        if let Some(events) = app.events.get(&sport.key) {
+            if let Some(match_data) = events.get(app.selected_match) {
+                breadcrumb.push(Span::styled(" > ", Style::default().fg(COLOR_BORDER)));
+                breadcrumb.push(Span::styled(
+                    match_data.sport_title.clone(), // or title if it was present
+                    Style::default().fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)
+                ));
+            }
         }
     }
 
@@ -92,45 +85,22 @@ fn draw_main_body(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_sports_column(app: &App, frame: &mut Frame, area: Rect) {
     let is_active = app.active_column == ActiveColumn::Sports;
-    let border_color = if is_active {
-        COLOR_BORDER_ACTIVE
-    } else {
-        COLOR_BORDER
-    };
+    let border_color = if is_active { COLOR_BORDER_ACTIVE } else { COLOR_BORDER };
 
     let block = Block::default()
-        .title(Span::styled(
-            " Sport ",
-            Style::default().fg(if is_active {
-                COLOR_ACTIVE_ITEM_FG
-            } else {
-                COLOR_TEXT
-            }),
-        ))
+        .title(Span::styled(" Sport (Antepost) ", Style::default().fg(if is_active { COLOR_ACTIVE_ITEM_FG } else { COLOR_TEXT })))
         .borders(Borders::ALL)
-        .border_type(if is_active {
-            BorderType::Thick
-        } else {
-            BorderType::Plain
-        })
+        .border_type(if is_active { BorderType::Thick } else { BorderType::Plain })
         .border_style(Style::default().fg(border_color));
 
-    let items: Vec<ListItem> = app
-        .sports
-        .iter()
-        .enumerate()
-        .map(|(i, sport)| {
-            let style = if i == app.selected_sport {
-                Style::default()
-                    .bg(COLOR_ACTIVE_ITEM_BG)
-                    .fg(COLOR_ACTIVE_ITEM_FG)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(COLOR_TEXT)
-            };
-            ListItem::new(Line::from(format!("  {}  ", sport.name))).style(style)
-        })
-        .collect();
+    let items: Vec<ListItem> = app.sports.iter().enumerate().map(|(i, sport)| {
+        let style = if i == app.selected_sport {
+            Style::default().bg(COLOR_ACTIVE_ITEM_BG).fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(COLOR_TEXT)
+        };
+        ListItem::new(Line::from(format!("  {}  ", sport.title))).style(style)
+    }).collect();
 
     let list = List::new(items).block(block);
     frame.render_widget(list, area);
@@ -138,41 +108,26 @@ fn draw_sports_column(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_matches_column(app: &App, frame: &mut Frame, area: Rect) {
     let is_active = app.active_column == ActiveColumn::Matches;
-    let border_color = if is_active {
-        COLOR_BORDER_ACTIVE
-    } else {
-        COLOR_BORDER
-    };
+    let border_color = if is_active { COLOR_BORDER_ACTIVE } else { COLOR_BORDER };
 
     let block = Block::default()
-        .title(Span::styled(
-            " Eventi ",
-            Style::default().fg(if is_active {
-                COLOR_ACTIVE_ITEM_FG
-            } else {
-                COLOR_TEXT
-            }),
-        ))
+        .title(Span::styled(" Eventi ", Style::default().fg(if is_active { COLOR_ACTIVE_ITEM_FG } else { COLOR_TEXT })))
         .borders(Borders::ALL)
-        .border_type(if is_active {
-            BorderType::Thick
-        } else {
-            BorderType::Plain
-        })
+        .border_type(if is_active { BorderType::Thick } else { BorderType::Plain })
         .border_style(Style::default().fg(border_color));
 
     let mut items = Vec::new();
     if let Some(sport) = app.sports.get(app.selected_sport) {
-        for (i, match_data) in sport.matches.iter().enumerate() {
-            let style = if i == app.selected_match {
-                Style::default()
-                    .bg(COLOR_ACTIVE_ITEM_BG)
-                    .fg(COLOR_ACTIVE_ITEM_FG)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(COLOR_TEXT)
-            };
-            items.push(ListItem::new(Line::from(format!("  {}  ", match_data.title))).style(style));
+        if let Some(events) = app.events.get(&sport.key) {
+            for (i, match_data) in events.iter().enumerate() {
+                let style = if i == app.selected_match {
+                    Style::default().bg(COLOR_ACTIVE_ITEM_BG).fg(COLOR_ACTIVE_ITEM_FG).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(COLOR_TEXT)
+                };
+                let display_title = match_data.home_team.clone().unwrap_or_else(|| match_data.id.clone());
+                items.push(ListItem::new(Line::from(format!("  {}  ", display_title))).style(style));
+            }
         }
     }
 
@@ -182,10 +137,7 @@ fn draw_matches_column(app: &App, frame: &mut Frame, area: Rect) {
 
 fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
     let block = Block::default()
-        .title(Span::styled(
-            " Quote & Analisi ",
-            Style::default().fg(COLOR_TEXT),
-        ))
+        .title(Span::styled(" Analisi Quote ", Style::default().fg(COLOR_TEXT)))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .border_style(Style::default().fg(COLOR_BORDER));
@@ -193,92 +145,94 @@ fn draw_odds_column(app: &App, frame: &mut Frame, area: Rect) {
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
 
+    if app.is_loading { return; }
+
     if let Some(sport) = app.sports.get(app.selected_sport) {
-        if let Some(match_data) = sport.matches.get(app.selected_match) {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(10), Constraint::Length(6)])
-                .margin(1) // Padding within the block
-                .split(inner_area);
+        if let Some(events) = app.events.get(&sport.key) {
+            if let Some(match_data) = events.get(app.selected_match) {
+                
+                // Estrai gli outcomes dal primo bookmaker
+                let mut outcomes = Vec::new();
+                let mut bookmaker_name = String::new();
+                let mut update_time = String::new();
 
-            // Draw Odds with Gauges
-            let odd_rects = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(
-                    match_data
-                        .odds
-                        .iter()
-                        .map(|_| Constraint::Length(2))
-                        .collect::<Vec<_>>(),
-                )
-                .split(chunks[0]);
-
-            for (i, odd) in match_data.odds.iter().enumerate() {
-                if i >= odd_rects.len() {
-                    break;
+                if let Some(bookmaker) = match_data.bookmakers.first() {
+                    bookmaker_name = bookmaker.title.clone();
+                    update_time = bookmaker.last_update.clone();
+                    if let Some(market) = bookmaker.markets.iter().find(|m| m.key == "outrights") {
+                        outcomes = market.outcomes.clone();
+                    }
                 }
 
-                let odd_area = odd_rects[i];
-                let odd_chunks = Layout::default()
-                    .direction(Direction::Horizontal)
+                // Ordina per probabilità (prezzo più basso = più probabile)
+                outcomes.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(std::cmp::Ordering::Equal));
+
+                let chunks = Layout::default()
+                    .direction(Direction::Vertical)
                     .constraints([
-                        Constraint::Percentage(40), // Name
-                        Constraint::Length(8),      // Price
-                        Constraint::Percentage(60), // Gauge
+                        Constraint::Min(10), // Odds list
+                        Constraint::Length(5), // Prediction / Info
                     ])
-                    .split(odd_area);
+                    .margin(1)
+                    .split(inner_area);
 
-                // Name
-                frame.render_widget(
-                    Paragraph::new(odd.name.clone())
-                        .style(Style::default().fg(COLOR_ACTIVE_ITEM_FG)),
-                    odd_chunks[0],
-                );
+                // Draw Odds with Gauges
+                let odd_rects = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(outcomes.iter().map(|_| Constraint::Length(2)).collect::<Vec<_>>())
+                    .split(chunks[0]);
 
-                // Price & Color logic
-                let prob = (1.0 / odd.price) * 100.0;
-                let prob_ratio = prob / 100.0;
-                let color = if odd.price < 2.0 {
-                    COLOR_SAFE
-                } else if odd.price < 4.0 {
-                    COLOR_MID
-                } else {
-                    COLOR_RISK
-                };
+                for (i, odd) in outcomes.iter().enumerate() {
+                    if i >= odd_rects.len() { break; }
+                    
+                    let odd_area = odd_rects[i];
+                    let odd_chunks = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints([
+                            Constraint::Percentage(40), // Name
+                            Constraint::Length(8),      // Price
+                            Constraint::Percentage(60), // Gauge
+                        ])
+                        .split(odd_area);
 
-                frame.render_widget(
-                    Paragraph::new(format!("{:.2}", odd.price))
-                        .style(Style::default().fg(color).add_modifier(Modifier::BOLD)),
-                    odd_chunks[1],
-                );
+                    frame.render_widget(
+                        Paragraph::new(odd.name.clone()).style(Style::default().fg(COLOR_ACTIVE_ITEM_FG)),
+                        odd_chunks[0],
+                    );
 
-                // Gauge
-                let gauge = Gauge::default()
-                    .gauge_style(Style::default().fg(color).bg(COLOR_BORDER))
-                    .ratio(prob_ratio.clamp(0.0, 1.0))
-                    .label(format!("{:.1}%", prob));
+                    let prob = (1.0 / odd.price) * 100.0;
+                    let prob_ratio = prob / 100.0;
+                    let color = if odd.price < 3.0 { COLOR_SAFE } else if odd.price < 10.0 { COLOR_MID } else { COLOR_RISK };
 
-                let gauge_area = Rect {
-                    x: odd_chunks[2].x,
-                    y: odd_chunks[2].y,
-                    width: odd_chunks[2].width,
-                    height: 1, // Single line gauge
-                };
-                frame.render_widget(gauge, gauge_area);
+                    frame.render_widget(
+                        Paragraph::new(format!("{:.2}", odd.price))
+                            .style(Style::default().fg(color).add_modifier(Modifier::BOLD)),
+                        odd_chunks[1],
+                    );
+
+                    let gauge = Gauge::default()
+                        .gauge_style(Style::default().fg(color).bg(COLOR_BORDER))
+                        .ratio(prob_ratio.clamp(0.0, 1.0))
+                        .label(format!("{:.1}%", prob));
+                    
+                    let gauge_area = Rect { x: odd_chunks[2].x, y: odd_chunks[2].y, width: odd_chunks[2].width, height: 1 };
+                    frame.render_widget(gauge, gauge_area);
+                }
+
+                // Draw Meta Info
+                let meta_block = Block::default()
+                    .title(" Metadati Bookmaker ")
+                    .borders(Borders::TOP)
+                    .border_style(Style::default().fg(COLOR_BORDER));
+
+                let info_text = format!("Provider: {}\nUltimo aggiornamento: {}", bookmaker_name, update_time);
+                let pred_text = Paragraph::new(info_text)
+                    .block(meta_block)
+                    .style(Style::default().fg(COLOR_TEXT))
+                    .wrap(Wrap { trim: true });
+
+                frame.render_widget(pred_text, chunks[1]);
             }
-
-            // Draw Prediction
-            let pred_block = Block::default()
-                .title(" Insight Predittivo ")
-                .borders(Borders::TOP)
-                .border_style(Style::default().fg(COLOR_BORDER));
-
-            let pred_text = Paragraph::new(match_data.prediction.clone())
-                .block(pred_block)
-                .style(Style::default().fg(COLOR_TEXT))
-                .wrap(Wrap { trim: true });
-
-            frame.render_widget(pred_text, chunks[1]);
         }
     }
 }
@@ -288,7 +242,7 @@ fn draw_footer(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
         .style(Style::default().fg(COLOR_BORDER));
-
+    
     let paragraph = Paragraph::new(Line::from(vec![
         Span::styled(" [TAB/Freccie] ", Style::default().fg(COLOR_BORDER_ACTIVE)),
         Span::raw("Naviga  "),
@@ -296,6 +250,6 @@ fn draw_footer(frame: &mut Frame, area: Rect) {
         Span::raw("Esci"),
     ]))
     .block(block);
-
+    
     frame.render_widget(paragraph, area);
 }
