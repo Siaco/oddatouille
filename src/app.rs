@@ -47,7 +47,7 @@ impl App {
         // Build mock data
         let sports = vec![
             SportMock {
-                name: "⚽ Calcio".into(),
+                name: "Calcio".into(),
                 matches: vec![
                     MatchMock {
                         title: "Vincente Serie A 24/25".into(),
@@ -70,7 +70,7 @@ impl App {
                 ]
             },
             SportMock {
-                name: "🏀 Basket (NBA)".into(),
+                name: "Basket (NBA)".into(),
                 matches: vec![
                     MatchMock {
                         title: "NBA Championship Winner".into(),
@@ -84,7 +84,7 @@ impl App {
                 ]
             },
             SportMock {
-                name: "🎾 Tennis".into(),
+                name: "Tennis".into(),
                 matches: vec![
                     MatchMock {
                         title: "Wimbledon 2025 Men".into(),
