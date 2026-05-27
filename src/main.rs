@@ -9,6 +9,7 @@ mod api;
 mod app;
 mod cache;
 mod events;
+mod models;
 mod ui;
 
 use app::App;
