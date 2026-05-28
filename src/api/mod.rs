@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use dotenvy::dotenv;
 use reqwest::Client;
 use std::env;
 
@@ -13,6 +14,7 @@ pub struct OddsApi {
 
 impl OddsApi {
     pub fn new() -> Result<Self> {
+        dotenv().ok();
         let api_key = env::var("ODDS_API_KEY")
             .context("Variabile ODDS_API_KEY non trovata. Controlla il file .env")?;
 
